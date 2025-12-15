@@ -1,0 +1,1349 @@
+import React, { useState, useEffect } from "react";
+import { initializeApp } from "firebase/app";
+import {
+  getAuth,
+  signInAnonymously,
+  onAuthStateChanged,
+  signInWithCustomToken,
+} from "firebase/auth";
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  onSnapshot,
+  arrayUnion,
+  deleteDoc,
+} from "firebase/firestore";
+import {
+  Skull,
+  Syringe, // Changed from Shield
+  Biohazard,
+  Users,
+  Play,
+  LogOut,
+  RotateCcw,
+  CheckCircle,
+  X,
+  History,
+  BookOpen,
+  ArrowRight,
+  Hammer,
+  Crown,
+  Ban,
+  Activity,
+  User,
+  Home,
+  Sparkles,
+} from "lucide-react";
+
+// --- Firebase Config ---
+const firebaseConfig = {
+  apiKey: "AIzaSyBjIjK53vVJW1y5RaqEFGSFp0ECVDBEe1o",
+  authDomain: "game-hub-ff8aa.firebaseapp.com",
+  projectId: "game-hub-ff8aa",
+  storageBucket: "game-hub-ff8aa.firebasestorage.app",
+  messagingSenderId: "586559578902",
+  appId: "1:586559578902:web:36417135068764fe6aa637",
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const APP_ID = typeof __app_id !== "undefined" ? __app_id : "last-of-us";
+const GAME_ID = "22";
+
+// --- Constants ---
+const CARD_DISTRIBUTION = {
+  2: 14,
+  3: 12,
+  4: 11,
+  5: 10,
+  6: 9,
+};
+
+// --- Helpers ---
+const generateDeck = () => {
+  const deck = [];
+  // Zombies (Odd)
+  const zombies = { 1: 2, 3: 4, 5: 6, 7: 8, 9: 6, 11: 4, 13: 2 };
+  Object.entries(zombies).forEach(([val, count]) => {
+    for (let i = 0; i < count; i++)
+      deck.push({ val: parseInt(val), type: "ZOMBIE" });
+  });
+  // Antidotes (Even)
+  const antidotes = { 2: 3, 4: 5, 6: 7, 8: 7, 10: 5, 12: 3 };
+  Object.entries(antidotes).forEach(([val, count]) => {
+    for (let i = 0; i < count; i++)
+      deck.push({ val: parseInt(val), type: "ANTIDOTE" });
+  });
+  return deck;
+};
+
+const shuffle = (array) => {
+  let currentIndex = array.length,
+    randomIndex;
+  while (currentIndex !== 0) {
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+    [array[currentIndex], array[randomIndex]] = [
+      array[randomIndex],
+      array[currentIndex],
+    ];
+  }
+  return array;
+};
+
+const isZombie = (val) => val % 2 !== 0;
+
+// --- Components ---
+
+const FloatingBackground = () => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+    <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-900/30 via-stone-950 to-black" />
+    <div className="absolute top-0 left-0 w-full h-full opacity-10">
+      {[...Array(20)].map((_, i) => (
+        <div
+          key={i}
+          className="absolute animate-float text-stone-500/20"
+          style={{
+            left: `${Math.random() * 100}%`,
+            top: `${Math.random() * 100}%`,
+            animationDuration: `${15 + Math.random() * 20}s`,
+            transform: `scale(${0.5 + Math.random()})`,
+          }}
+        >
+          {i % 2 === 0 ? <Skull size={48} /> : <Syringe size={48} />}
+        </div>
+      ))}
+    </div>
+    <style>{`
+      @keyframes float {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        50% { transform: translateY(-20px) rotate(10deg); }
+      }
+      .animate-float { animation: float infinite ease-in-out; }
+    `}</style>
+  </div>
+);
+
+const Card = ({
+  val,
+  type,
+  count = 1,
+  size = "md",
+  selected = false,
+  onClick,
+  disabled = false,
+  faded = false,
+  isBoard = false,
+}) => {
+  const isZ = type === "ZOMBIE";
+
+  let bgClass = "";
+  if (isBoard) {
+    bgClass = isZ
+      ? "bg-red-900 border-red-600 shadow-red-900/40"
+      : "bg-lime-900 border-lime-500 shadow-lime-900/40";
+  } else {
+    bgClass = isZ
+      ? "bg-gradient-to-b from-red-800 to-stone-900 border-red-600"
+      : "bg-gradient-to-b from-lime-700 to-stone-900 border-lime-500";
+  }
+
+  const textClass = isZ ? "text-red-100" : "text-lime-100";
+  const iconColor = isZ ? "text-red-500/30" : "text-lime-400/30";
+
+  // Increased icon sizes for better visibility
+  const iconSize = size === "lg" ? 64 : size === "md" ? 48 : 24;
+
+  const sizeClasses =
+    size === "lg"
+      ? "w-20 h-32 md:w-28 md:h-40 text-3xl md:text-5xl"
+      : size === "sm"
+      ? "w-10 h-14 text-xs"
+      : "w-16 h-24 md:w-20 md:h-28 text-xl md:text-2xl";
+
+  return (
+    <div
+      onClick={!disabled ? onClick : undefined}
+      className={`
+        ${sizeClasses} rounded-xl border-2 flex flex-col items-center justify-center shadow-xl relative overflow-hidden transition-all duration-200 shrink-0
+        ${bgClass}
+        ${
+          selected ? "ring-4 ring-yellow-400 -translate-y-4 z-20 scale-110" : ""
+        }
+        ${
+          disabled
+            ? faded
+              ? "opacity-40 grayscale"
+              : "cursor-default"
+            : "cursor-pointer hover:scale-105"
+        }
+        ${!disabled && !selected ? "hover:-translate-y-1" : ""}
+      `}
+    >
+      <div
+        className={`absolute top-1 left-2 font-black opacity-70 text-[10px] ${textClass}`}
+      >
+        {isZ ? "ZMB" : "ANT"}
+      </div>
+      <div className={`font-black ${textClass} z-10`}>{val}</div>
+
+      {/* Icon positioning and sizing tweak */}
+      {isZ ? (
+        <div className={`absolute -bottom-2 -right-2 ${iconColor}`}>
+          <Skull size={iconSize} strokeWidth={2.5} />
+        </div>
+      ) : (
+        <div className={`absolute -bottom-2 -right-2 ${iconColor}`}>
+          <Syringe size={iconSize} strokeWidth={2.5} />
+        </div>
+      )}
+
+      {count > 1 && (
+        <div className="absolute top-[-5px] right-[-5px] bg-yellow-500 text-black font-bold rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-md border border-yellow-600 z-20">
+          x{count}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Modals ---
+
+const LeaveConfirmModal = ({
+  onConfirmLeave,
+  onConfirmLobby,
+  onCancel,
+  isHost,
+  inGame,
+}) => (
+  <div className="fixed inset-0 bg-black/90 z-[200] flex items-center justify-center p-4 animate-in fade-in">
+    <div className="bg-stone-900 rounded-xl border border-red-900/50 p-6 max-w-sm w-full text-center shadow-2xl relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-transparent" />
+      <h3 className="text-xl font-bold text-white mb-2 flex items-center justify-center gap-2">
+        <Biohazard className="text-red-500" /> Abandon Zone?
+      </h3>
+      <p className="text-gray-400 mb-6 text-sm">
+        {inGame
+          ? "Leaving now will disrupt the survival effort."
+          : "Disconnect from the safe house?"}
+      </p>
+      <div className="flex flex-col gap-3">
+        <button
+          onClick={onCancel}
+          className="bg-gray-800 hover:bg-gray-700 text-white py-3 rounded font-bold transition-colors"
+        >
+          Stay (Cancel)
+        </button>
+        {isHost && inGame && (
+          <button
+            onClick={onConfirmLobby}
+            className="py-3 rounded font-bold transition-colors flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-600 text-white shadow-lg"
+          >
+            <Home size={18} /> Return Group to Lobby
+          </button>
+        )}
+        <button
+          onClick={onConfirmLeave}
+          className="bg-red-700 hover:bg-red-600 text-white py-3 rounded font-bold transition-colors flex items-center justify-center gap-2 shadow-lg"
+        >
+          <LogOut size={18} /> Leave Game
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+const GameGuideModal = ({ onClose }) => (
+  <div className="fixed inset-0 bg-black/95 z-[150] flex items-center justify-center p-4">
+    <div className="bg-stone-900 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden border border-red-900/30 flex flex-col">
+      <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-black/50">
+        <h2 className="text-2xl font-black text-red-500 uppercase tracking-widest flex items-center gap-2">
+          <Skull /> Survival Guide
+        </h2>
+        <button
+          onClick={onClose}
+          className="p-2 hover:bg-gray-800 rounded-full text-gray-400"
+        >
+          <X />
+        </button>
+      </div>
+      <div className="p-6 overflow-y-auto space-y-6 text-gray-300 text-left">
+        <section>
+          <h3 className="text-white font-bold text-lg mb-2 flex items-center gap-2">
+            <Biohazard className="text-green-500" size={20} /> The Basics
+          </h3>
+          <p className="text-sm">
+            Get rid of your cards. Be the last survivor. <br /> Odd cards are{" "}
+            <strong>Zombies</strong>. Even cards are <strong>Antidotes</strong>.
+          </p>
+        </section>
+        <section>
+          <h3 className="text-white font-bold text-lg mb-2 flex items-center gap-2">
+            <ArrowRight className="text-blue-400" size={20} /> Placement Rules
+          </h3>
+          <ul className="list-disc pl-5 space-y-1 text-sm">
+            <li>
+              Cards on the board are arranged in{" "}
+              <strong>Ascending Order</strong>.
+            </li>
+            <li>
+              You can play cards <strong>Lower</strong> than the minimum or{" "}
+              <strong>Higher</strong> than the maximum.
+            </li>
+            <li>You CANNOT play inside the cage (between min and max).</li>
+            <li>
+              <strong>The Twist:</strong> Two cards of the same type
+              (Zombie/Zombie or Antidote/Antidote) CANNOT sit next to each other
+              horizontally.
+            </li>
+            <li>You CAN stack a matching card on top of an existing one.</li>
+          </ul>
+        </section>
+        <section>
+          <h3 className="text-white font-bold text-lg mb-2 flex items-center gap-2">
+            <Users className="text-yellow-400" size={20} /> Multi-Play &
+            Quarantine
+          </h3>
+          <p className="text-sm mb-2">
+            If you play on the edges, you must play <strong>at least</strong> as
+            many cards as are currently on that edge stack. If you stack on top,
+            you just add to it.
+          </p>
+          <p className="text-sm border-l-4 border-red-600 pl-3 py-1 bg-red-900/10">
+            <strong>Stuck?</strong> Select <strong>QUARANTINE</strong> mode,
+            then click a card on the board to take it as a penalty. You are out
+            for the round.
+          </p>
+        </section>
+      </div>
+      <div className="p-4 bg-black/50 border-t border-gray-800 text-center">
+        <button
+          onClick={onClose}
+          className="bg-red-700 hover:bg-red-600 text-white px-8 py-3 rounded-lg font-bold"
+        >
+          Survive
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+// --- Main Game Component ---
+
+export default function LastOfUs() {
+  const [user, setUser] = useState(null);
+  const [view, setView] = useState("menu");
+  const [playerName, setPlayerName] = useState("");
+  const [roomId, setRoomId] = useState("");
+  const [roomCodeInput, setRoomCodeInput] = useState("");
+  const [gameState, setGameState] = useState(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [selectedCards, setSelectedCards] = useState([]); // Stores INDICES of selected cards
+  const [isQuarantineMode, setIsQuarantineMode] = useState(false); // New state for selection mode
+  const [isMaintenance, setIsMaintenance] = useState(false);
+
+  // --- Auth ---
+  useEffect(() => {
+    const initAuth = async () => {
+      if (typeof __initial_auth_token !== "undefined" && __initial_auth_token) {
+        await signInWithCustomToken(auth, __initial_auth_token);
+      } else {
+        await signInAnonymously(auth);
+      }
+    };
+    initAuth();
+    onAuthStateChanged(auth, setUser);
+  }, []);
+
+  // --- Maintenance Check ---
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "game_hub_settings", "config"), (doc) => {
+      if (doc.exists() && doc.data()[GAME_ID]?.maintenance) {
+        setIsMaintenance(true);
+      } else {
+        setIsMaintenance(false);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // --- Game Sync ---
+  useEffect(() => {
+    if (!roomId || !user) return;
+    const unsub = onSnapshot(
+      doc(db, "artifacts", APP_ID, "public", "data", "rooms", roomId),
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setGameState(data);
+          if (data.status === "playing" || data.status === "finished")
+            setView("game");
+          else if (data.status === "lobby") setView("lobby");
+
+          // FIX: Ensure data.players exists and turnIndex is valid before accessing
+          if (
+            data.turnIndex !== undefined &&
+            data.players &&
+            data.players[data.turnIndex] &&
+            user
+          ) {
+            const isMyTurn = data.players[data.turnIndex].id === user.uid;
+            if (!isMyTurn) setIsQuarantineMode(false);
+          }
+        } else {
+          setRoomId("");
+          setView("menu");
+          setError("Safe house compromised (Room closed).");
+        }
+      }
+    );
+    return () => unsub();
+  }, [roomId, user]);
+
+  // --- Logic Helpers ---
+
+  const validatePlay = (cardsToPlay, board) => {
+    if (cardsToPlay.length === 0) return { valid: false, msg: "Select cards." };
+
+    // Check if all selected cards are same value
+    const val = cardsToPlay[0].val;
+    const type = cardsToPlay[0].type;
+    const count = cardsToPlay.length;
+    if (!cardsToPlay.every((c) => c.val === val))
+      return { valid: false, msg: "Must play identical cards." };
+
+    if (board.length === 0) return { valid: true };
+
+    const minCard = board[0];
+    const maxCard = board[board.length - 1];
+
+    // Case 1: Stacking
+    const matchIndex = board.findIndex((c) => c.val === val);
+    if (matchIndex !== -1) {
+      // Logic for Stacking:
+      // You can ONLY stack on the Edges (Min or Max). Stacking in the middle is forbidden ("never in the middle").
+      const isEdge = matchIndex === 0 || matchIndex === board.length - 1;
+
+      if (!isEdge) {
+        return {
+          valid: false,
+          msg: "Cannot play inside the cage (even to stack).",
+        };
+      }
+
+      // Logic for Stacking on Edges (Count Rule):
+      // If playing on the edge, "same or higher number of cards" rule applies.
+      const targetStack = board[matchIndex];
+      if (count < targetStack.count) {
+        return {
+          valid: false,
+          msg: `Must play at least ${targetStack.count} cards to stack on this edge.`,
+        };
+      }
+
+      return { valid: true, action: "STACK", index: matchIndex };
+    }
+
+    // Case 2: Playing Outside
+    if (val > minCard.val && val < maxCard.val) {
+      return { valid: false, msg: "Cannot play inside the cage." };
+    }
+
+    // Check Adjacency Rule (Zombie/Zombie or Antidote/Antidote)
+    if (val < minCard.val) {
+      // Playing Left
+      if (type === minCard.type)
+        return {
+          valid: false,
+          msg: `Cannot place ${type} next to ${minCard.type}.`,
+        };
+      // Count check: Must play >= minCard.count
+      if (count < minCard.count)
+        return {
+          valid: false,
+          msg: `Must play at least ${minCard.count} cards here (matches edge stack).`,
+        };
+
+      return { valid: true, action: "LEFT" };
+    } else if (val > maxCard.val) {
+      // Playing Right
+      if (type === maxCard.type)
+        return {
+          valid: false,
+          msg: `Cannot place ${type} next to ${maxCard.type}.`,
+        };
+      // Count check: Must play >= maxCard.count
+      if (count < maxCard.count)
+        return {
+          valid: false,
+          msg: `Must play at least ${maxCard.count} cards here (matches edge stack).`,
+        };
+
+      return { valid: true, action: "RIGHT" };
+    }
+
+    return { valid: false, msg: "Invalid move." };
+  };
+
+  // --- Actions ---
+
+  const createRoom = async () => {
+    if (!playerName) return setError("Name required");
+    setLoading(true);
+    const newId = Math.random().toString(36).substring(2, 7).toUpperCase();
+
+    await setDoc(
+      doc(db, "artifacts", APP_ID, "public", "data", "rooms", newId),
+      {
+        roomId: newId,
+        hostId: user.uid,
+        status: "lobby",
+        players: [
+          {
+            id: user.uid,
+            name: playerName,
+            hand: [],
+            quarantined: false,
+            ready: false,
+          },
+        ],
+        board: [],
+        deck: [],
+        turnIndex: 0,
+        activeRoundPlayers: [], // IDs of players still in round
+        logs: [],
+        winner: null,
+      }
+    );
+    setRoomId(newId);
+    setLoading(false);
+  };
+
+  const joinRoom = async () => {
+    if (!roomCodeInput || !playerName) return setError("Details required");
+    setLoading(true);
+    const ref = doc(
+      db,
+      "artifacts",
+      APP_ID,
+      "public",
+      "data",
+      "rooms",
+      roomCodeInput
+    );
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      setError("Room not found");
+      setLoading(false);
+      return;
+    }
+
+    const data = snap.data();
+    if (data.status !== "lobby") {
+      setError("Game in progress");
+      setLoading(false);
+      return;
+    }
+    if (data.players.length >= 6) {
+      setError("Room full");
+      setLoading(false);
+      return;
+    }
+
+    if (!data.players.find((p) => p.id === user.uid)) {
+      await updateDoc(ref, {
+        players: arrayUnion({
+          id: user.uid,
+          name: playerName,
+          hand: [],
+          quarantined: false,
+          ready: false,
+        }),
+      });
+    }
+    setRoomId(roomCodeInput);
+    setLoading(false);
+  };
+
+  const startGame = async () => {
+    if (gameState.hostId !== user.uid) return;
+    const pCount = gameState.players.length;
+
+    // Distribute cards
+    const fullDeck = shuffle(generateDeck());
+    const handSize = CARD_DISTRIBUTION[pCount] || 10;
+
+    const players = gameState.players.map((p) => {
+      const hand = fullDeck.splice(0, handSize).sort((a, b) => a.val - b.val);
+      return { ...p, hand, quarantined: false };
+    });
+
+    const activeRoundPlayers = players.map((p) => p.id); // All players start in round
+
+    await updateDoc(
+      doc(db, "artifacts", APP_ID, "public", "data", "rooms", roomId),
+      {
+        status: "playing",
+        players,
+        deck: fullDeck, // Remaining cards (unused this game)
+        board: [],
+        activeRoundPlayers,
+        turnIndex: 0,
+        logs: [{ text: "Survival begins. Good luck.", type: "neutral" }],
+      }
+    );
+  };
+
+  const handlePlayCards = async () => {
+    const meIdx = gameState.players.findIndex((p) => p.id === user.uid);
+    const me = gameState.players[meIdx];
+
+    // FIX: Map selected indices to card objects
+    const cardsToPlay = selectedCards.map((idx) => me.hand[idx]);
+
+    // Validation
+    const result = validatePlay(cardsToPlay, gameState.board);
+    if (!result.valid) {
+      setError(result.msg);
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
+
+    // Execute Play
+    const newBoard = [...gameState.board];
+    const cardVal = cardsToPlay[0].val; // Use resolved value
+    const cardType = cardsToPlay[0].type;
+    const count = cardsToPlay.length;
+
+    // Update Board
+    if (result.action === "STACK") {
+      newBoard[result.index].count += count;
+    } else if (result.action === "LEFT") {
+      newBoard.unshift({ val: cardVal, type: cardType, count });
+    } else if (result.action === "RIGHT") {
+      newBoard.push({ val: cardVal, type: cardType, count });
+    } else {
+      // First play
+      newBoard.push({ val: cardVal, type: cardType, count });
+    }
+
+    const updatedPlayers = [...gameState.players];
+    // Reconstruct hand to ensure correct removal
+    const remainingHand = [];
+    let removed = 0;
+    for (let c of me.hand) {
+      if (c.val === cardVal && removed < count) {
+        removed++;
+      } else {
+        remainingHand.push(c);
+      }
+    }
+    updatedPlayers[meIdx].hand = remainingHand;
+
+    // Check Win (Empty Hand)
+    if (remainingHand.length === 0) {
+      await updateDoc(
+        doc(db, "artifacts", APP_ID, "public", "data", "rooms", roomId),
+        {
+          players: updatedPlayers,
+          board: newBoard,
+          status: "finished",
+          winner: me,
+          logs: arrayUnion({
+            text: `${me.name} survived! Game Over.`,
+            type: "success",
+          }),
+        }
+      );
+      setSelectedCards([]);
+      return;
+    }
+
+    // Determine Next Turn
+    let nextTurnIdx = (gameState.turnIndex + 1) % updatedPlayers.length;
+    let loops = 0;
+    while (
+      !gameState.activeRoundPlayers.includes(updatedPlayers[nextTurnIdx].id) ||
+      updatedPlayers[nextTurnIdx].quarantined
+    ) {
+      nextTurnIdx = (nextTurnIdx + 1) % updatedPlayers.length;
+      loops++;
+      if (loops > updatedPlayers.length) break;
+    }
+
+    await updateDoc(
+      doc(db, "artifacts", APP_ID, "public", "data", "rooms", roomId),
+      {
+        players: updatedPlayers,
+        board: newBoard,
+        turnIndex: nextTurnIdx,
+        logs: arrayUnion({
+          text: `${me.name} played ${count}x ${cardVal}.`,
+          type: "neutral",
+        }),
+      }
+    );
+    setSelectedCards([]);
+  };
+
+  // Modified Quarantine Logic - Selection Phase
+  const initiateQuarantine = () => {
+    setIsQuarantineMode(true);
+    setError("Select a card from the board to take.");
+  };
+
+  const handleBoardCardClick = async (cardIndex) => {
+    if (!isQuarantineMode) return;
+
+    const meIdx = gameState.players.findIndex((p) => p.id === user.uid);
+    const me = gameState.players[meIdx];
+    const board = [...gameState.board];
+
+    if (board.length === 0) return;
+
+    // Take specific card selected by index
+    const penaltyCardObj = board[cardIndex];
+    const penaltyCard = { val: penaltyCardObj.val, type: penaltyCardObj.type };
+
+    // Remove one count from board
+    if (penaltyCardObj.count > 1) {
+      board[cardIndex].count -= 1;
+    } else {
+      board.splice(cardIndex, 1);
+    }
+
+    // Add to player hand
+    const newHand = [...me.hand, penaltyCard].sort((a, b) => a.val - b.val);
+    const updatedPlayers = [...gameState.players];
+    updatedPlayers[meIdx].hand = newHand;
+    updatedPlayers[meIdx].quarantined = true;
+
+    // Remove from active round
+    const newActivePlayers = gameState.activeRoundPlayers.filter(
+      (id) => id !== user.uid
+    );
+
+    const logs = [
+      {
+        text: `${me.name} quarantined and took ${penaltyCard.val}.`,
+        type: "danger",
+      },
+    ];
+
+    // Check Round End
+    if (newActivePlayers.length === 1) {
+      // One survivor remains. They win the round.
+      const winnerId = newActivePlayers[0];
+      const winner = updatedPlayers.find((p) => p.id === winnerId);
+      logs.push({
+        text: `${winner.name} won the round! Board cleared.`,
+        type: "success",
+      });
+
+      const resetPlayers = updatedPlayers.map((p) => ({
+        ...p,
+        quarantined: false,
+      }));
+
+      const winnerIdx = resetPlayers.findIndex((p) => p.id === winnerId);
+
+      await updateDoc(
+        doc(db, "artifacts", APP_ID, "public", "data", "rooms", roomId),
+        {
+          players: resetPlayers,
+          board: [], // Clear board
+          activeRoundPlayers: resetPlayers.map((p) => p.id), // All back in
+          turnIndex: winnerIdx,
+          logs: arrayUnion(...logs),
+        }
+      );
+    } else {
+      // Move turn
+      let nextTurnIdx = (gameState.turnIndex + 1) % updatedPlayers.length;
+      while (
+        !newActivePlayers.includes(updatedPlayers[nextTurnIdx].id) ||
+        updatedPlayers[nextTurnIdx].quarantined
+      ) {
+        nextTurnIdx = (nextTurnIdx + 1) % updatedPlayers.length;
+      }
+
+      await updateDoc(
+        doc(db, "artifacts", APP_ID, "public", "data", "rooms", roomId),
+        {
+          players: updatedPlayers,
+          board,
+          activeRoundPlayers: newActivePlayers,
+          turnIndex: nextTurnIdx,
+          logs: arrayUnion(...logs),
+        }
+      );
+    }
+    setIsQuarantineMode(false);
+    setError("");
+  };
+
+  const leaveRoom = async () => {
+    if (!roomId || !user) return;
+    try {
+      const roomRef = doc(
+        db,
+        "artifacts",
+        APP_ID,
+        "public",
+        "data",
+        "rooms",
+        roomId
+      );
+      const snap = await getDoc(roomRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        const isHost = data.hostId === user.uid;
+        if (isHost && data.status === "lobby") {
+          await deleteDoc(roomRef);
+        } else {
+          const newPlayers = data.players.filter((p) => p.id !== user.uid);
+          let newStatus = data.status;
+          if (data.status === "playing" && newPlayers.length < 2)
+            newStatus = "finished";
+          await updateDoc(roomRef, {
+            players: newPlayers,
+            status: newStatus,
+            logs: arrayUnion({ text: `${playerName} fled.`, type: "danger" }),
+          });
+        }
+      }
+    } catch (e) {}
+    setRoomId("");
+    setView("menu");
+    setGameState(null);
+    setShowLeaveConfirm(false);
+  };
+
+  const resetGame = async () => {
+    if (gameState.hostId !== user.uid) return;
+    await updateDoc(
+      doc(db, "artifacts", APP_ID, "public", "data", "rooms", roomId),
+      {
+        status: "lobby",
+        players: gameState.players.map((p) => ({
+          ...p,
+          hand: [],
+          quarantined: false,
+          ready: false,
+        })),
+        board: [],
+        logs: [],
+      }
+    );
+  };
+
+  const handleCardClick = (card, index) => {
+    if (selectedCards.includes(index)) {
+      setSelectedCards(selectedCards.filter((i) => i !== index));
+    } else {
+      if (selectedCards.length > 0) {
+        const firstIdx = selectedCards[0];
+        const me = gameState.players.find((p) => p.id === user.uid);
+        const firstCard = me.hand[firstIdx];
+        if (firstCard.val !== card.val) {
+          setSelectedCards([index]); // Switch to new value
+          return;
+        }
+      }
+      setSelectedCards([...selectedCards, index]);
+    }
+  };
+
+  // --- Render ---
+
+  if (isMaintenance) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center text-white p-4 text-center">
+        <div className="bg-orange-500/10 p-8 rounded-2xl border border-orange-500/30">
+          <Hammer
+            size={64}
+            className="text-orange-500 mx-auto mb-4 animate-bounce"
+          />
+          <h1 className="text-3xl font-bold mb-2">Under Maintenance</h1>
+          <p className="text-gray-400">
+            Zombies are lurking around. Wait for the sunlight to scare them
+            away.
+          </p>
+        </div>
+        {/* Add Spacing Between Boxes */}
+        <div className="h-8"></div>
+
+        {/* Clickable Second Card */}
+        <a href="https://rawfidkshuvo.github.io/gamehub/">
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <div className="text-center pb-12 animate-pulse">
+              <div className="inline-flex items-center gap-3 px-8 py-4 bg-slate-900/50 rounded-full border border-indigo-500/20 text-indigo-300 font-bold tracking-widest text-sm uppercase backdrop-blur-sm">
+                <Sparkles size={16} /> Visit Gamehub...Try our other releases...{" "}
+                <Sparkles size={16} />
+              </div>
+            </div>
+          </div>
+        </a>
+      </div>
+    );
+  }
+
+  if (view === "menu") {
+    return (
+      <div className="min-h-screen bg-stone-950 text-white flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">
+        <FloatingBackground />
+        <div className="z-10 text-center mb-8 animate-in fade-in zoom-in duration-700 w-full px-4">
+          <div className="flex justify-center gap-4 mb-4">
+            <Skull size={50} className="text-red-600 animate-bounce" />
+            <Syringe
+              size={50}
+              className="text-lime-500 animate-bounce delay-75"
+            />
+          </div>
+          <h1 className="text-4xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-stone-500 uppercase tracking-tighter">
+            Last of Us
+          </h1>
+          <p className="text-stone-500 tracking-[0.5em] uppercase mt-2 font-bold text-xs md:text-sm">
+            Survive the Horde
+          </p>
+        </div>
+
+        <div className="bg-stone-900/80 backdrop-blur border border-red-900/30 p-6 md:p-8 rounded-2xl w-full max-w-md shadow-2xl z-10 mx-4">
+          {error && (
+            <div className="bg-red-900/50 text-red-200 p-2 mb-4 rounded text-center text-sm border border-red-800">
+              {error}
+            </div>
+          )}
+          <input
+            className="w-full bg-black/50 border border-stone-700 p-3 rounded-xl mb-4 text-white focus:border-red-500 outline-none text-sm"
+            placeholder="Survivor Name"
+            value={playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+          />
+          <button
+            onClick={createRoom}
+            disabled={loading}
+            className="w-full bg-red-800 hover:bg-red-700 p-4 rounded-xl font-bold mb-4 flex items-center justify-center gap-2 transition-all shadow-lg text-sm md:text-base"
+          >
+            <Play size={20} /> New Survival Zone
+          </button>
+          <div className="flex gap-2 mb-4">
+            <input
+              className="flex-1 bg-black/50 border border-stone-700 p-3 rounded-xl text-white focus:border-red-500 outline-none uppercase text-sm"
+              placeholder="CODE"
+              value={roomCodeInput}
+              onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
+            />
+            <button
+              onClick={joinRoom}
+              disabled={loading}
+              className="bg-stone-700 hover:bg-stone-600 px-6 rounded-xl font-bold transition-all text-sm"
+            >
+              Join
+            </button>
+          </div>
+          <button
+            onClick={() => setShowGuide(true)}
+            className="w-full text-center text-stone-500 hover:text-stone-300 text-sm flex items-center justify-center gap-2"
+          >
+            <BookOpen size={14} /> Field Manual
+          </button>
+        </div>
+        {showGuide && <GameGuideModal onClose={() => setShowGuide(false)} />}
+      </div>
+    );
+  }
+
+  if (view === "lobby" && gameState) {
+    const isHost = gameState.hostId === user.uid;
+    return (
+      <div className="min-h-screen bg-stone-950 text-white flex flex-col items-center justify-center p-6 relative">
+        <FloatingBackground />
+        {showLeaveConfirm && (
+          <LeaveConfirmModal
+            onConfirmLeave={leaveRoom}
+            onConfirmLobby={null}
+            onCancel={() => setShowLeaveConfirm(false)}
+            isHost={isHost}
+            inGame={false}
+          />
+        )}
+
+        <div className="z-10 w-full max-w-lg bg-stone-900/90 backdrop-blur p-8 rounded-2xl border border-red-900/30 shadow-2xl">
+          <div className="flex justify-between items-center mb-6 pb-4 border-b border-stone-800">
+            <div>
+              <h2 className="text-xl text-red-600 font-bold uppercase">
+                Safe Zone
+              </h2>
+              <div className="text-3xl font-mono text-white font-black">
+                {gameState.roomId}
+              </div>
+            </div>
+            <button
+              onClick={() => setShowLeaveConfirm(true)}
+              className="p-2 bg-red-900/30 text-red-400 rounded-full hover:bg-red-900/50"
+            >
+              <LogOut size={20} />
+            </button>
+          </div>
+          <div className="space-y-3 mb-8">
+            {gameState.players.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-stone-800"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-stone-800">
+                    <User size={18} className="text-stone-400" />
+                  </div>
+                  <span
+                    className={`font-bold ${
+                      p.id === user.uid ? "text-red-500" : "text-stone-400"
+                    }`}
+                  >
+                    {p.name}
+                  </span>
+                </div>
+                {p.id === gameState.hostId && (
+                  <Crown size={16} className="text-yellow-500" />
+                )}
+              </div>
+            ))}
+            {gameState.players.length < 2 && (
+              <div className="text-center text-stone-600 py-4 italic">
+                Need at least 2 survivors...
+              </div>
+            )}
+          </div>
+          {isHost ? (
+            <button
+              onClick={startGame}
+              disabled={gameState.players.length < 2}
+              className="w-full py-4 rounded-xl font-black text-xl uppercase tracking-widest bg-red-700 hover:bg-red-600 text-white shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Start Game
+            </button>
+          ) : (
+            <div className="w-full py-4 rounded-xl font-bold text-center text-stone-500 bg-stone-800/50 border border-stone-700 animate-pulse">
+              Waiting for Host...
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "game" && gameState) {
+    const me = gameState.players.find((p) => p.id === user.uid);
+    if (!me)
+      return (
+        <div className="min-h-screen bg-stone-950 flex items-center justify-center text-white">
+          Loading...
+        </div>
+      );
+
+    const isMyTurn = gameState.players[gameState.turnIndex].id === user.uid;
+    const opponent = gameState.players.filter((p) => p.id !== user.uid);
+    const activeLogs = gameState.logs.slice(-2).reverse();
+
+    // Resolve selected cards objects
+    const mySelectedObjects = selectedCards.map((idx) => me.hand[idx]);
+
+    return (
+      <div className="h-screen bg-stone-950 text-white flex flex-col relative overflow-hidden font-sans">
+        <FloatingBackground />
+        {showLeaveConfirm && (
+          <LeaveConfirmModal
+            onConfirmLeave={leaveRoom}
+            onConfirmLobby={() => {
+              resetGame();
+              setShowLeaveConfirm(false);
+            }}
+            onCancel={() => setShowLeaveConfirm(false)}
+            isHost={gameState.hostId === user.uid}
+            inGame={true}
+          />
+        )}
+        {showGuide && <GameGuideModal onClose={() => setShowGuide(false)} />}
+
+        {/* Header */}
+        <div className="h-14 bg-stone-900/90 border-b border-stone-800 flex items-center justify-between px-4 z-50 sticky top-0 backdrop-blur-md">
+          <div className="flex items-center gap-2">
+            <Biohazard className="text-red-600" size={24} />
+            <span className="font-black uppercase hidden md:block">
+              Last of Us
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowGuide(true)}
+              className="p-2 text-stone-400 hover:bg-stone-800 rounded-full"
+            >
+              <BookOpen size={20} />
+            </button>
+            <button
+              onClick={() => setShowLogs(!showLogs)}
+              className={`p-2 rounded-full ${
+                showLogs
+                  ? "bg-red-900/50 text-red-200"
+                  : "text-stone-400 hover:bg-stone-800"
+              }`}
+            >
+              <History size={20} />
+            </button>
+            <button
+              onClick={() => setShowLeaveConfirm(true)}
+              className="p-2 text-red-400 hover:bg-red-900/20 rounded-full"
+            >
+              <LogOut size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Logs Overlay - Modal */}
+        {showLogs && (
+          <div className="absolute top-16 right-4 z-50 bg-stone-900/95 border border-stone-700 p-2 rounded-xl max-h-60 overflow-y-auto w-64 shadow-2xl">
+            {[...gameState.logs].reverse().map((l, i) => (
+              <div
+                key={i}
+                className={`text-xs p-2 mb-1 rounded border-l-2 ${
+                  l.type === "danger"
+                    ? "bg-red-900/20 border-red-500 text-red-200"
+                    : "bg-stone-800 border-stone-600 text-gray-400"
+                }`}
+              >
+                {l.text}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Winner Screen */}
+        {gameState.status === "finished" && (
+          <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-6 text-center animate-in zoom-in">
+            <Crown size={80} className="text-yellow-500 mb-6 animate-bounce" />
+            <h1 className="text-5xl font-black text-white mb-4">
+              Survivor Found!
+            </h1>
+            <p className="text-2xl text-stone-300 mb-8">
+              {gameState.winner.name} cleared their hand!
+            </p>
+            {gameState.hostId === user.uid && (
+              <button
+                onClick={resetGame}
+                className="px-8 py-3 bg-red-700 hover:bg-red-600 rounded-xl font-bold text-white shadow-lg flex items-center gap-2"
+              >
+                <RotateCcw size={20} /> New Game
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Main Area */}
+        <div className="flex-1 flex flex-col w-full max-w-6xl mx-auto p-2 gap-2 overflow-hidden relative">
+          {/* Opponents (Top) */}
+          <div className="flex-none h-24 md:h-28 flex items-start justify-center gap-2 overflow-x-auto no-scrollbar px-2 py-2">
+            {opponent.map((p) => (
+              <div
+                key={p.id}
+                className={`flex flex-col items-center min-w-[80px] md:min-w-[100px] p-2 rounded-xl border ${
+                  p.quarantined
+                    ? "border-red-900 bg-red-900/20 opacity-50"
+                    : "border-stone-700 bg-stone-900/50"
+                } ${
+                  gameState.players[gameState.turnIndex].id === p.id
+                    ? "ring-2 ring-yellow-500"
+                    : ""
+                }`}
+              >
+                <div className="flex items-center gap-1 mb-1">
+                  {p.quarantined && <Ban size={12} className="text-red-500" />}
+                  <span className="text-xs font-bold truncate max-w-[60px] md:max-w-[70px]">
+                    {p.name}
+                  </span>
+                </div>
+                <div className="flex gap-1 overflow-hidden h-8 md:h-12 w-full justify-center">
+                  {p.hand.length > 0 ? (
+                    <div className="flex -space-x-2">
+                      {p.hand.map((_, i) => (
+                        <div
+                          key={i}
+                          className="w-4 md:w-6 h-6 md:h-8 bg-stone-700 rounded border border-stone-600 shadow-sm"
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-green-500">Safe</span>
+                  )}
+                </div>
+                <span className="text-[10px] text-stone-500">
+                  {p.hand.length} Cards
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Board (Center) */}
+          <div className="flex-1 flex flex-col items-center justify-center relative min-h-0 bg-stone-900/30 rounded-2xl border border-stone-800/30 mx-2">
+            {/* Center Logs & Errors (Vertically Stacked Flex Container) */}
+            <div className="absolute top-4 left-0 right-0 flex flex-col items-center pointer-events-none z-10 w-full space-y-2">
+              {!showLogs &&
+                activeLogs.map((l, i) => (
+                  <div
+                    key={i}
+                    className={`px-4 py-1 rounded-full text-[10px] md:text-xs font-bold shadow-lg backdrop-blur-md border animate-in fade-in zoom-in duration-300 ${
+                      l.type === "danger"
+                        ? "bg-red-900/50 border-red-500 text-red-100"
+                        : "bg-stone-800/50 border-stone-600 text-stone-300"
+                    }`}
+                  >
+                    {l.text}
+                  </div>
+                ))}
+
+              {/* Error Message - Now stacked immediately below logs */}
+              {error && (
+                <div className="px-6 py-2 rounded-full text-sm font-bold bg-red-600 text-white shadow-xl animate-bounce whitespace-nowrap border-4 border-red-800">
+                  {error}
+                </div>
+              )}
+            </div>
+
+            {gameState.board.length === 0 ? (
+              <div className="text-stone-600 text-sm font-bold border-2 border-dashed border-stone-800 rounded-xl p-8">
+                Board Empty
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 md:gap-2 overflow-x-auto p-4 w-full justify-start md:justify-center no-scrollbar h-full">
+                {gameState.board.map((card, i) => (
+                  <div
+                    key={i}
+                    className="transform hover:scale-105 transition-transform shrink-0"
+                  >
+                    <Card
+                      val={card.val}
+                      type={card.type}
+                      count={card.count}
+                      size="lg"
+                      isBoard={true}
+                      disabled={!isQuarantineMode}
+                      selected={isQuarantineMode}
+                      onClick={() => handleBoardCardClick(i)}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Play Actions */}
+            {isMyTurn && !me.quarantined && (
+              <div className="absolute bottom-4 flex gap-4 z-20">
+                {isQuarantineMode ? (
+                  <div className="flex flex-col items-center gap-2 animate-in slide-in-from-bottom-2">
+                    <div className="bg-red-900/80 px-4 py-2 rounded text-red-200 text-sm font-bold border border-red-500 shadow-xl">
+                      Tap a card to take penalty
+                    </div>
+                    <button
+                      onClick={() => setIsQuarantineMode(false)}
+                      className="px-6 py-2 rounded-xl font-bold bg-gray-700 hover:bg-gray-600 text-gray-200 shadow-lg"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={handlePlayCards}
+                      disabled={selectedCards.length === 0}
+                      className={`px-6 md:px-8 py-3 rounded-xl font-black text-lg md:text-xl shadow-xl flex items-center gap-2 transition-all ${
+                        selectedCards.length > 0
+                          ? "bg-yellow-500 hover:bg-yellow-400 text-black hover:scale-105"
+                          : "bg-stone-800 text-stone-500 cursor-not-allowed"
+                      }`}
+                    >
+                      PLAY{" "}
+                      {selectedCards.length > 0 && `(${selectedCards.length})`}
+                    </button>
+                    <button
+                      onClick={initiateQuarantine}
+                      className="px-4 md:px-6 py-3 rounded-xl font-bold bg-red-900/50 hover:bg-red-800 text-red-200 border border-red-800 flex items-center gap-2 transition-all"
+                    >
+                      <Ban size={18} />{" "}
+                      <span className="inline">QUARANTINE</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+            {isMyTurn && me.quarantined && (
+              <div className="absolute bottom-4 text-red-500 font-bold animate-pulse bg-black/50 px-4 py-2 rounded-xl">
+                You are Quarantined. Skip turn.
+              </div>
+            )}
+            {!isMyTurn && (
+              <div className="absolute bottom-4 px-4 py-2 bg-stone-900 rounded-full text-stone-500 text-sm border border-stone-800 animate-pulse">
+                Waiting for survivors...
+              </div>
+            )}
+          </div>
+
+          {/* My Hand (Bottom) */}
+          <div className="flex-none bg-stone-900/95 p-2 md:p-4 rounded-t-3xl border-t border-red-900/30 shadow-2xl relative z-30 w-full overflow-hidden">
+            <div className="flex justify-between items-center mb-2 px-2">
+              <span className="text-[10px] md:text-xs font-bold text-stone-400 uppercase tracking-widest">
+                Inventory ({me.hand.length})
+              </span>
+              <span className="text-[8px] md:text-[10px] font-bold text-stone-500">
+                Match count on edges
+              </span>
+            </div>
+            <div className="flex gap-2 md:gap-4 overflow-x-auto pb-4 pt-2 px-2 no-scrollbar">
+              {(() => {
+                const renderedGroups = [];
+                let currentGroup = [];
+                for (let i = 0; i < me.hand.length; i++) {
+                  const card = me.hand[i];
+                  if (i > 0 && me.hand[i - 1].val !== card.val) {
+                    renderedGroups.push(currentGroup);
+                    currentGroup = [];
+                  }
+                  currentGroup.push({ card, index: i });
+                }
+                if (currentGroup.length > 0) renderedGroups.push(currentGroup);
+
+                return renderedGroups.map((group, gIdx) => (
+                  <div
+                    key={gIdx}
+                    className="flex -space-x-6 md:-space-x-8 hover:space-x-1 transition-all duration-300 pr-4 shrink-0"
+                  >
+                    {group.map(({ card, index }) => (
+                      <div key={index}>
+                        <Card
+                          val={card.val}
+                          type={card.type}
+                          size="md"
+                          selected={selectedCards.includes(index)}
+                          onClick={() => handleCardClick(card, index)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
