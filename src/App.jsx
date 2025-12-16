@@ -18,7 +18,7 @@ import {
 } from "firebase/firestore";
 import {
   Skull,
-  Syringe, // Changed from Shield
+  Syringe,
   Biohazard,
   Users,
   Play,
@@ -36,6 +36,7 @@ import {
   User,
   Home,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 
 // --- Firebase Config ---
@@ -94,8 +95,6 @@ const shuffle = (array) => {
   }
   return array;
 };
-
-const isZombie = (val) => val % 2 !== 0;
 
 // --- Components ---
 
@@ -311,7 +310,7 @@ const GameGuideModal = ({ onClose }) => (
           <p className="text-sm mb-2">
             If you play on the edges, you must play <strong>at least</strong> as
             many cards as are currently on that edge stack. If you stack on top,
-            you just add to it.
+            just follow the same rule.
           </p>
           <p className="text-sm border-l-4 border-red-600 pl-3 py-1 bg-red-900/10">
             <strong>Stuck?</strong> Select <strong>QUARANTINE</strong> mode,
@@ -350,6 +349,12 @@ export default function LastOfUs() {
   const [isQuarantineMode, setIsQuarantineMode] = useState(false); // New state for selection mode
   const [isMaintenance, setIsMaintenance] = useState(false);
 
+  // Helper for auto-dismissing errors
+  const showError = (msg) => {
+    setError(msg);
+    setTimeout(() => setError(""), 3000);
+  };
+
   // --- Auth ---
   useEffect(() => {
     const initAuth = async () => {
@@ -383,6 +388,15 @@ export default function LastOfUs() {
       (snap) => {
         if (snap.exists()) {
           const data = snap.data();
+
+          // Check if I am still in the player list
+          if (data.players && !data.players.find((p) => p.id === user.uid)) {
+            setRoomId("");
+            setView("menu");
+            showError("You have been kicked from the safe house.");
+            return;
+          }
+
           setGameState(data);
           if (data.status === "playing" || data.status === "finished")
             setView("game");
@@ -401,7 +415,7 @@ export default function LastOfUs() {
         } else {
           setRoomId("");
           setView("menu");
-          setError("Safe house compromised (Room closed).");
+          showError("Safe house compromised (Room closed).");
         }
       }
     );
@@ -496,7 +510,7 @@ export default function LastOfUs() {
   // --- Actions ---
 
   const createRoom = async () => {
-    if (!playerName) return setError("Name required");
+    if (!playerName) return showError("Name required");
     setLoading(true);
     const newId = Math.random().toString(36).substring(2, 7).toUpperCase();
 
@@ -528,7 +542,7 @@ export default function LastOfUs() {
   };
 
   const joinRoom = async () => {
-    if (!roomCodeInput || !playerName) return setError("Details required");
+    if (!roomCodeInput || !playerName) return showError("Details required");
     setLoading(true);
     const ref = doc(
       db,
@@ -541,19 +555,19 @@ export default function LastOfUs() {
     );
     const snap = await getDoc(ref);
     if (!snap.exists()) {
-      setError("Room not found");
+      showError("Room not found");
       setLoading(false);
       return;
     }
 
     const data = snap.data();
     if (data.status !== "lobby") {
-      setError("Game in progress");
+      showError("Game in progress");
       setLoading(false);
       return;
     }
     if (data.players.length >= 6) {
-      setError("Room full");
+      showError("Room full");
       setLoading(false);
       return;
     }
@@ -573,6 +587,17 @@ export default function LastOfUs() {
     setLoading(false);
   };
 
+  const kickPlayer = async (pid) => {
+    if (gameState.hostId !== user.uid) return;
+    const players = gameState.players.filter((p) => p.id !== pid);
+    await updateDoc(
+      doc(db, "artifacts", APP_ID, "public", "data", "rooms", roomId),
+      {
+        players,
+      }
+    );
+  };
+
   const startGame = async () => {
     if (gameState.hostId !== user.uid) return;
     const pCount = gameState.players.length;
@@ -583,7 +608,7 @@ export default function LastOfUs() {
 
     const players = gameState.players.map((p) => {
       const hand = fullDeck.splice(0, handSize).sort((a, b) => a.val - b.val);
-      return { ...p, hand, quarantined: false };
+      return { ...p, hand, quarantined: false, ready: false }; // Reset ready
     });
 
     const activeRoundPlayers = players.map((p) => p.id); // All players start in round
@@ -602,6 +627,45 @@ export default function LastOfUs() {
     );
   };
 
+  const restartGame = async () => {
+    if (gameState.hostId !== user.uid) return;
+    await startGame(); // Re-use start game logic to deal new cards
+  };
+
+  const returnToLobby = async () => {
+    if (gameState.hostId !== user.uid) return;
+    const players = gameState.players.map((p) => ({
+      ...p,
+      hand: [],
+      quarantined: false,
+      ready: false,
+    }));
+
+    await updateDoc(
+      doc(db, "artifacts", APP_ID, "public", "data", "rooms", roomId),
+      {
+        status: "lobby",
+        players,
+        board: [],
+        logs: [],
+        activeRoundPlayers: [],
+      }
+    );
+    setShowLeaveConfirm(false);
+  };
+
+  const toggleReady = async () => {
+    if (!roomId || !user) return;
+    const updatedPlayers = gameState.players.map((p) =>
+      p.id === user.uid ? { ...p, ready: !p.ready } : p
+    );
+
+    await updateDoc(
+      doc(db, "artifacts", APP_ID, "public", "data", "rooms", roomId),
+      { players: updatedPlayers }
+    );
+  };
+
   const handlePlayCards = async () => {
     const meIdx = gameState.players.findIndex((p) => p.id === user.uid);
     const me = gameState.players[meIdx];
@@ -612,8 +676,7 @@ export default function LastOfUs() {
     // Validation
     const result = validatePlay(cardsToPlay, gameState.board);
     if (!result.valid) {
-      setError(result.msg);
-      setTimeout(() => setError(""), 3000);
+      showError(result.msg);
       return;
     }
 
@@ -697,7 +760,7 @@ export default function LastOfUs() {
   // Modified Quarantine Logic - Selection Phase
   const initiateQuarantine = () => {
     setIsQuarantineMode(true);
-    setError("Select a card from the board to take.");
+    // Removed redundant error message here as UI shows prompt
   };
 
   const handleBoardCardClick = async (cardIndex) => {
@@ -825,24 +888,6 @@ export default function LastOfUs() {
     setView("menu");
     setGameState(null);
     setShowLeaveConfirm(false);
-  };
-
-  const resetGame = async () => {
-    if (gameState.hostId !== user.uid) return;
-    await updateDoc(
-      doc(db, "artifacts", APP_ID, "public", "data", "rooms", roomId),
-      {
-        status: "lobby",
-        players: gameState.players.map((p) => ({
-          ...p,
-          hand: [],
-          quarantined: false,
-          ready: false,
-        })),
-        board: [],
-        logs: [],
-      }
-    );
   };
 
   const handleCardClick = (card, index) => {
@@ -1012,9 +1057,20 @@ export default function LastOfUs() {
                     {p.name}
                   </span>
                 </div>
-                {p.id === gameState.hostId && (
-                  <Crown size={16} className="text-yellow-500" />
-                )}
+                <div className="flex items-center gap-2">
+                  {p.id === gameState.hostId && (
+                    <Crown size={16} className="text-yellow-500" />
+                  )}
+                  {isHost && p.id !== user.uid && (
+                    <button
+                      onClick={() => kickPlayer(p.id)}
+                      className="text-stone-600 hover:text-red-500 p-1 transition-colors"
+                      title="Kick Player"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
             {gameState.players.length < 2 && (
@@ -1054,8 +1110,10 @@ export default function LastOfUs() {
     const opponent = gameState.players.filter((p) => p.id !== user.uid);
     const activeLogs = gameState.logs.slice(-2).reverse();
 
-    // Resolve selected cards objects
-    const mySelectedObjects = selectedCards.map((idx) => me.hand[idx]);
+    // Check readiness for next game (excluding host from needing to press ready button, they control the flow)
+    const allGuestsReady = gameState.players
+      .filter((p) => p.id !== gameState.hostId)
+      .every((p) => p.ready);
 
     return (
       <div className="h-screen bg-stone-950 text-white flex flex-col relative overflow-hidden font-sans">
@@ -1063,10 +1121,7 @@ export default function LastOfUs() {
         {showLeaveConfirm && (
           <LeaveConfirmModal
             onConfirmLeave={leaveRoom}
-            onConfirmLobby={() => {
-              resetGame();
-              setShowLeaveConfirm(false);
-            }}
+            onConfirmLobby={returnToLobby} // Use returnToLobby instead of resetGame to fully reset state
             onCancel={() => setShowLeaveConfirm(false)}
             isHost={gameState.hostId === user.uid}
             inGame={true}
@@ -1136,14 +1191,81 @@ export default function LastOfUs() {
             <p className="text-2xl text-stone-300 mb-8">
               {gameState.winner.name} cleared their hand!
             </p>
-            {gameState.hostId === user.uid && (
-              <button
-                onClick={resetGame}
-                className="px-8 py-3 bg-red-700 hover:bg-red-600 rounded-xl font-bold text-white shadow-lg flex items-center gap-2"
-              >
-                <RotateCcw size={20} /> New Game
-              </button>
-            )}
+
+            <div className="grid grid-cols-2 gap-4 max-w-md w-full mb-8">
+              {gameState.players.map((p) => (
+                <div
+                  key={p.id}
+                  className="bg-stone-800 p-4 rounded-xl flex justify-between items-center border border-stone-700"
+                >
+                  <div className="flex items-center gap-2">
+                    {p.ready && (
+                      <CheckCircle size={16} className="text-green-500" />
+                    )}
+                    <span
+                      className={
+                        p.id === gameState.winner.id
+                          ? "text-yellow-400 font-bold"
+                          : "text-gray-400"
+                      }
+                    >
+                      {p.name}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-4 items-center w-full max-w-md">
+              {gameState.hostId !== user.uid ? (
+                // Guest View
+                !me.ready ? (
+                  <button
+                    onClick={toggleReady}
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white shadow-lg animate-pulse transition-all hover:scale-105"
+                  >
+                    Ready for Next Game
+                  </button>
+                ) : (
+                  <div className="w-full py-3 bg-stone-800 rounded-xl font-bold text-green-400 border border-green-500/50 flex items-center justify-center gap-2">
+                    <CheckCircle size={20} /> Waiting for host...
+                  </div>
+                )
+              ) : (
+                // Host View
+                <div className="flex flex-col w-full gap-3">
+                  <div className="flex gap-4 w-full">
+                    <button
+                      onClick={returnToLobby}
+                      disabled={!allGuestsReady}
+                      className={`flex-1 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+                        allGuestsReady
+                          ? "bg-stone-700 hover:bg-stone-600 text-white hover:scale-105"
+                          : "bg-stone-800 text-stone-500 cursor-not-allowed border border-stone-700"
+                      }`}
+                    >
+                      <LogOut size={18} /> Lobby
+                    </button>
+                    <button
+                      onClick={restartGame}
+                      disabled={!allGuestsReady}
+                      className={`flex-1 py-3 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 ${
+                        allGuestsReady
+                          ? "bg-red-700 hover:bg-red-600 hover:scale-105"
+                          : "bg-stone-800 text-stone-500 cursor-not-allowed border border-stone-700"
+                      }`}
+                    >
+                      <RotateCcw size={18} /> Restart
+                    </button>
+                  </div>
+                  {!allGuestsReady && (
+                    <p className="text-stone-500 text-sm animate-pulse">
+                      Waiting for survivors to report in...
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
