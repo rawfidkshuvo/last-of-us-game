@@ -38,7 +38,6 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-
 // --- Firebase Config ---
 const firebaseConfig = {
   apiKey: "AIzaSyBjIjK53vVJW1y5RaqEFGSFp0ECVDBEe1o",
@@ -63,7 +62,6 @@ const CARD_DISTRIBUTION = {
   5: 10,
   6: 9,
 };
-
 // --- Helpers ---
 const generateDeck = () => {
   const deck = [];
@@ -97,6 +95,15 @@ const shuffle = (array) => {
 };
 
 // --- Components ---
+
+const Logo = () => (
+  <div className="flex items-center justify-center gap-1 opacity-40 mt-auto pb-2 pt-2 relative z-10">
+    <Skull size={12} className="text-red-600" />
+    <span className="text-[10px] font-black tracking-widest text-red-600 uppercase">
+      LAST OF US
+    </span>
+  </div>
+);
 
 const FloatingBackground = () => (
   <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
@@ -139,7 +146,6 @@ const Card = ({
   isBoard = false,
 }) => {
   const isZ = type === "ZOMBIE";
-
   let bgClass = "";
   if (isBoard) {
     bgClass = isZ
@@ -153,7 +159,6 @@ const Card = ({
 
   const textClass = isZ ? "text-red-100" : "text-lime-100";
   const iconColor = isZ ? "text-red-500/30" : "text-lime-400/30";
-
   // Increased icon sizes for better visibility
   const iconSize = size === "lg" ? 64 : size === "md" ? 48 : 24;
 
@@ -163,7 +168,6 @@ const Card = ({
       : size === "sm"
       ? "w-10 h-14 text-xs"
       : "w-16 h-24 md:w-20 md:h-28 text-xl md:text-2xl";
-
   return (
     <div
       onClick={!disabled ? onClick : undefined}
@@ -209,7 +213,6 @@ const Card = ({
     </div>
   );
 };
-
 // --- Modals ---
 
 const LeaveConfirmModal = ({
@@ -330,7 +333,6 @@ const GameGuideModal = ({ onClose }) => (
     </div>
   </div>
 );
-
 // --- Main Game Component ---
 
 export default function LastOfUs() {
@@ -345,8 +347,10 @@ export default function LastOfUs() {
   const [showGuide, setShowGuide] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
-  const [selectedCards, setSelectedCards] = useState([]); // Stores INDICES of selected cards
-  const [isQuarantineMode, setIsQuarantineMode] = useState(false); // New state for selection mode
+  const [selectedCards, setSelectedCards] = useState([]);
+  // Stores INDICES of selected cards
+  const [isQuarantineMode, setIsQuarantineMode] = useState(false);
+  // New state for selection mode
   const [isMaintenance, setIsMaintenance] = useState(false);
 
   // Helper for auto-dismissing errors
@@ -354,6 +358,24 @@ export default function LastOfUs() {
     setError(msg);
     setTimeout(() => setError(""), 3000);
   };
+
+  // --- Session Persistence ---
+
+  [cite_start]// 1. On Mount: Check for saved session [cite: 302, 354]
+  useEffect(() => {
+    const savedRoomId = localStorage.getItem("lastofus_room_id");
+    if (savedRoomId) {
+      setRoomId(savedRoomId);
+      // setView is handled by the onSnapshot listener below
+    }
+  }, []);
+
+  // 2. Sync: Save Room ID when it exists
+  useEffect(() => {
+    if (roomId) {
+      localStorage.setItem("lastofus_room_id", roomId);
+    }
+  }, [roomId]);
 
   // --- Auth ---
   useEffect(() => {
@@ -367,7 +389,6 @@ export default function LastOfUs() {
     initAuth();
     onAuthStateChanged(auth, setUser);
   }, []);
-
   // --- Maintenance Check ---
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "game_hub_settings", "config"), (doc) => {
@@ -379,7 +400,6 @@ export default function LastOfUs() {
     });
     return () => unsub();
   }, []);
-
   // --- Game Sync ---
   useEffect(() => {
     if (!roomId || !user) return;
@@ -389,10 +409,11 @@ export default function LastOfUs() {
         if (snap.exists()) {
           const data = snap.data();
 
-          // Check if I am still in the player list
+          [cite_start]// Check if I am still in the player list [cite: 363, 364]
           if (data.players && !data.players.find((p) => p.id === user.uid)) {
             setRoomId("");
             setView("menu");
+            localStorage.removeItem("lastofus_room_id"); // Clear session if kicked
             showError("You have been kicked from the safe house.");
             return;
           }
@@ -415,6 +436,7 @@ export default function LastOfUs() {
         } else {
           setRoomId("");
           setView("menu");
+          localStorage.removeItem("lastofus_room_id"); // Clear session if room deleted
           showError("Safe house compromised (Room closed).");
         }
       }
@@ -438,12 +460,12 @@ export default function LastOfUs() {
 
     const minCard = board[0];
     const maxCard = board[board.length - 1];
-
     // Case 1: Stacking
     const matchIndex = board.findIndex((c) => c.val === val);
     if (matchIndex !== -1) {
       // Logic for Stacking:
-      // You can ONLY stack on the Edges (Min or Max). Stacking in the middle is forbidden ("never in the middle").
+      // You can ONLY stack on the Edges (Min or Max).
+      // Stacking in the middle is forbidden ("never in the middle").
       const isEdge = matchIndex === 0 || matchIndex === board.length - 1;
 
       if (!isEdge) {
@@ -485,7 +507,6 @@ export default function LastOfUs() {
           valid: false,
           msg: `Must play at least ${minCard.count} cards here (matches edge stack).`,
         };
-
       return { valid: true, action: "LEFT" };
     } else if (val > maxCard.val) {
       // Playing Right
@@ -500,13 +521,11 @@ export default function LastOfUs() {
           valid: false,
           msg: `Must play at least ${maxCard.count} cards here (matches edge stack).`,
         };
-
       return { valid: true, action: "RIGHT" };
     }
 
     return { valid: false, msg: "Invalid move." };
   };
-
   // --- Actions ---
 
   const createRoom = async () => {
@@ -601,16 +620,13 @@ export default function LastOfUs() {
   const startGame = async () => {
     if (gameState.hostId !== user.uid) return;
     const pCount = gameState.players.length;
-
     // Distribute cards
     const fullDeck = shuffle(generateDeck());
     const handSize = CARD_DISTRIBUTION[pCount] || 10;
-
     const players = gameState.players.map((p) => {
       const hand = fullDeck.splice(0, handSize).sort((a, b) => a.val - b.val);
       return { ...p, hand, quarantined: false, ready: false }; // Reset ready
     });
-
     const activeRoundPlayers = players.map((p) => p.id); // All players start in round
 
     await updateDoc(
@@ -629,9 +645,9 @@ export default function LastOfUs() {
 
   const restartGame = async () => {
     if (gameState.hostId !== user.uid) return;
-    await startGame(); // Re-use start game logic to deal new cards
+    await startGame();
+    // Re-use start game logic to deal new cards
   };
-
   const returnToLobby = async () => {
     if (gameState.hostId !== user.uid) return;
     const players = gameState.players.map((p) => ({
@@ -640,7 +656,6 @@ export default function LastOfUs() {
       quarantined: false,
       ready: false,
     }));
-
     await updateDoc(
       doc(db, "artifacts", APP_ID, "public", "data", "rooms", roomId),
       {
@@ -659,7 +674,6 @@ export default function LastOfUs() {
     const updatedPlayers = gameState.players.map((p) =>
       p.id === user.uid ? { ...p, ready: !p.ready } : p
     );
-
     await updateDoc(
       doc(db, "artifacts", APP_ID, "public", "data", "rooms", roomId),
       { players: updatedPlayers }
@@ -672,7 +686,6 @@ export default function LastOfUs() {
 
     // FIX: Map selected indices to card objects
     const cardsToPlay = selectedCards.map((idx) => me.hand[idx]);
-
     // Validation
     const result = validatePlay(cardsToPlay, gameState.board);
     if (!result.valid) {
@@ -682,10 +695,10 @@ export default function LastOfUs() {
 
     // Execute Play
     const newBoard = [...gameState.board];
-    const cardVal = cardsToPlay[0].val; // Use resolved value
+    const cardVal = cardsToPlay[0].val;
+    // Use resolved value
     const cardType = cardsToPlay[0].type;
     const count = cardsToPlay.length;
-
     // Update Board
     if (result.action === "STACK") {
       newBoard[result.index].count += count;
@@ -710,7 +723,6 @@ export default function LastOfUs() {
       }
     }
     updatedPlayers[meIdx].hand = remainingHand;
-
     // Check Win (Empty Hand)
     if (remainingHand.length === 0) {
       await updateDoc(
@@ -756,20 +768,16 @@ export default function LastOfUs() {
     );
     setSelectedCards([]);
   };
-
   // Modified Quarantine Logic - Selection Phase
   const initiateQuarantine = () => {
     setIsQuarantineMode(true);
     // Removed redundant error message here as UI shows prompt
   };
-
   const handleBoardCardClick = async (cardIndex) => {
     if (!isQuarantineMode) return;
-
     const meIdx = gameState.players.findIndex((p) => p.id === user.uid);
     const me = gameState.players[meIdx];
     const board = [...gameState.board];
-
     if (board.length === 0) return;
 
     // Take specific card selected by index
@@ -788,34 +796,30 @@ export default function LastOfUs() {
     const updatedPlayers = [...gameState.players];
     updatedPlayers[meIdx].hand = newHand;
     updatedPlayers[meIdx].quarantined = true;
-
     // Remove from active round
     const newActivePlayers = gameState.activeRoundPlayers.filter(
       (id) => id !== user.uid
     );
-
     const logs = [
       {
         text: `${me.name} quarantined and took ${penaltyCard.val}.`,
         type: "danger",
       },
     ];
-
     // Check Round End
     if (newActivePlayers.length === 1) {
-      // One survivor remains. They win the round.
+      // One survivor remains.
+      // They win the round.
       const winnerId = newActivePlayers[0];
       const winner = updatedPlayers.find((p) => p.id === winnerId);
       logs.push({
         text: `${winner.name} won the round! Board cleared.`,
         type: "success",
       });
-
       const resetPlayers = updatedPlayers.map((p) => ({
         ...p,
         quarantined: false,
       }));
-
       const winnerIdx = resetPlayers.findIndex((p) => p.id === winnerId);
 
       await updateDoc(
@@ -855,6 +859,10 @@ export default function LastOfUs() {
 
   const leaveRoom = async () => {
     if (!roomId || !user) return;
+
+    [cite_start]// Explicitly Clear Session [cite: 302, 354, 450]
+    localStorage.removeItem("lastofus_room_id");
+
     try {
       const roomRef = doc(
         db,
@@ -869,9 +877,12 @@ export default function LastOfUs() {
       if (snap.exists()) {
         const data = snap.data();
         const isHost = data.hostId === user.uid;
-        if (isHost && data.status === "lobby") {
+        if (isHost) {
+          [cite_start]// Host Exit: Delete room [cite: 453]
+          // This triggers !snap.exists() for other players, sending them home
           await deleteDoc(roomRef);
         } else {
+          [cite_start]// Guest Exit: Remove self [cite: 454]
           const newPlayers = data.players.filter((p) => p.id !== user.uid);
           let newStatus = data.status;
           if (data.status === "playing" && newPlayers.length < 2)
@@ -899,14 +910,14 @@ export default function LastOfUs() {
         const me = gameState.players.find((p) => p.id === user.uid);
         const firstCard = me.hand[firstIdx];
         if (firstCard.val !== card.val) {
-          setSelectedCards([index]); // Switch to new value
+          setSelectedCards([index]);
+          // Switch to new value
           return;
         }
       }
       setSelectedCards([...selectedCards, index]);
     }
   };
-
   // --- Render ---
 
   if (isMaintenance) {
@@ -927,6 +938,7 @@ export default function LastOfUs() {
         <div className="h-8"></div>
 
         {/* Clickable Second Card */}
+
         <a href="https://rawfidkshuvo.github.io/gamehub/">
           <div className="flex items-center justify-center gap-3 mb-2">
             <div className="text-center pb-12 animate-pulse">
@@ -1093,6 +1105,7 @@ export default function LastOfUs() {
             </div>
           )}
         </div>
+        <Logo />
       </div>
     );
   }
@@ -1105,16 +1118,13 @@ export default function LastOfUs() {
           Loading...
         </div>
       );
-
     const isMyTurn = gameState.players[gameState.turnIndex].id === user.uid;
     const opponent = gameState.players.filter((p) => p.id !== user.uid);
     const activeLogs = gameState.logs.slice(-2).reverse();
-
     // Check readiness for next game (excluding host from needing to press ready button, they control the flow)
     const allGuestsReady = gameState.players
       .filter((p) => p.id !== gameState.hostId)
       .every((p) => p.ready);
-
     return (
       <div className="h-screen bg-stone-950 text-white flex flex-col relative overflow-hidden font-sans">
         <FloatingBackground />
@@ -1440,7 +1450,6 @@ export default function LastOfUs() {
                   currentGroup.push({ card, index: i });
                 }
                 if (currentGroup.length > 0) renderedGroups.push(currentGroup);
-
                 return renderedGroups.map((group, gIdx) => (
                   <div
                     key={gIdx}
@@ -1463,6 +1472,7 @@ export default function LastOfUs() {
             </div>
           </div>
         </div>
+        <Logo />
       </div>
     );
   }
