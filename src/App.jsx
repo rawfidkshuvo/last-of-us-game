@@ -1058,6 +1058,20 @@ export default function LastOfUs() {
           </button>
         </div>
         {showGuide && <GameGuideModal onClose={() => setShowGuide(false)} />}
+        <div className="absolute bottom-4 text-slate-600 text-xs text-center">
+          Inspired by I'm Out. A tribute game.
+          <br />
+          Developed by <strong>RAWFID K SHUVO</strong>. Visit{" "}
+          <a
+            href="https://rawfidkshuvo.github.io/gamehub/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-red-500 underline hover:text-red-600"
+          >
+            GAMEHUB
+          </a>{" "}
+          for more games.
+        </div>
       </div>
     );
   }
