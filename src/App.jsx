@@ -40,7 +40,8 @@ import {
 } from "lucide-react";
 
 // --- Firebase Config ---
-const firebaseConfig = {
+// Using environment config for compatibility with the preview environment
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
   apiKey: "AIzaSyBjIjK53vVJW1y5RaqEFGSFp0ECVDBEe1o",
   authDomain: "game-hub-ff8aa.firebaseapp.com",
   projectId: "game-hub-ff8aa",
@@ -48,6 +49,7 @@ const firebaseConfig = {
   messagingSenderId: "586559578902",
   appId: "1:586559578902:web:36417135068764fe6aa637",
 };
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -905,16 +907,35 @@ export default function LastOfUs() {
           // Regular player leaving
           const newPlayers = data.players.filter((p) => p.id !== user.uid);
           let newStatus = data.status;
-          if (data.status === "playing" && newPlayers.length < 2)
+          let newWinner = data.winner; // Preserve existing winner or undefined
+
+          // If game is in progress and only 1 player remains (the Host usually, or whoever is left)
+          // We set status to finished so the remaining player sees the game over screen
+          if (data.status === "playing" && newPlayers.length < 2) {
             newStatus = "finished";
-          await updateDoc(roomRef, {
+            if (newPlayers.length > 0) {
+              // The last remaining player wins by default
+              newWinner = newPlayers[0];
+            }
+          }
+
+          const updatePayload = {
             players: newPlayers,
             status: newStatus,
             logs: arrayUnion({ text: `${playerName} fled.`, type: "danger" }),
-          });
+          };
+
+          // Explicitly set winner if we found one
+          if (newWinner) {
+            updatePayload.winner = newWinner;
+          }
+
+          await updateDoc(roomRef, updatePayload);
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("Error leaving room:", e);
+    }
 
     // Clear local session logic
     localStorage.removeItem("lastofus_roomId");
@@ -1224,7 +1245,7 @@ export default function LastOfUs() {
               Survivor Found!
             </h1>
             <p className="text-2xl text-stone-300 mb-8">
-              {gameState.winner.name} cleared their hand!
+              {gameState.winner ? gameState.winner.name : "Unknown Survivor"} cleared their hand!
             </p>
 
             <div className="grid grid-cols-2 gap-4 max-w-md w-full mb-8">
@@ -1239,7 +1260,7 @@ export default function LastOfUs() {
                     )}
                     <span
                       className={
-                        p.id === gameState.winner.id
+                        p.id === gameState.winner?.id
                           ? "text-yellow-400 font-bold"
                           : "text-gray-400"
                       }
