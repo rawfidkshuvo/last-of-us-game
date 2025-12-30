@@ -41,14 +41,17 @@ import {
 
 // --- Firebase Config ---
 // Using environment config for compatibility with the preview environment
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-  apiKey: "AIzaSyBjIjK53vVJW1y5RaqEFGSFp0ECVDBEe1o",
-  authDomain: "game-hub-ff8aa.firebaseapp.com",
-  projectId: "game-hub-ff8aa",
-  storageBucket: "game-hub-ff8aa.firebasestorage.app",
-  messagingSenderId: "586559578902",
-  appId: "1:586559578902:web:36417135068764fe6aa637",
-};
+const firebaseConfig =
+  typeof __firebase_config !== "undefined"
+    ? JSON.parse(__firebase_config)
+    : {
+        apiKey: "AIzaSyBjIjK53vVJW1y5RaqEFGSFp0ECVDBEe1o",
+        authDomain: "game-hub-ff8aa.firebaseapp.com",
+        projectId: "game-hub-ff8aa",
+        storageBucket: "game-hub-ff8aa.firebasestorage.app",
+        messagingSenderId: "586559578902",
+        appId: "1:586559578902:web:36417135068764fe6aa637",
+      };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -1200,7 +1203,7 @@ export default function LastOfUs() {
         {showGuide && <GameGuideModal onClose={() => setShowGuide(false)} />}
 
         {/* Header */}
-        <div className="h-14 bg-stone-900/90 border-b border-stone-800 flex items-center justify-between px-4 z-50 sticky top-0 backdrop-blur-md">
+        <div className="h-14 bg-stone-900/90 border-b border-stone-800 flex items-center justify-between px-4 z-[160] sticky top-0 backdrop-blur-md">
           <div className="flex items-center gap-2">
             <Biohazard className="text-red-600" size={24} />
             <span className="font-black uppercase hidden md:block">
@@ -1235,7 +1238,7 @@ export default function LastOfUs() {
 
         {/* Logs Overlay - Modal */}
         {showLogs && (
-          <div className="absolute top-16 right-4 z-50 bg-stone-900/95 border border-stone-700 p-2 rounded-xl max-h-60 overflow-y-auto w-64 shadow-2xl">
+          <div className="fixed top-16 right-4 z-[155] bg-stone-900/95 border border-stone-700 p-2 rounded-xl max-h-60 overflow-y-auto w-64 shadow-2xl">
             {[...gameState.logs].reverse().map((l, i) => (
               <div
                 key={i}
@@ -1253,13 +1256,14 @@ export default function LastOfUs() {
 
         {/* Winner Screen */}
         {gameState.status === "finished" && (
-          <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-6 text-center animate-in zoom-in">
+          <div className="fixed inset-0 top-14 z-[150] bg-black/95 flex flex-col items-center justify-center p-6 text-center animate-in zoom-in">
             <Crown size={80} className="text-yellow-500 mb-6 animate-bounce" />
             <h1 className="text-5xl font-black text-white mb-4">
               Survivor Found!
             </h1>
             <p className="text-2xl text-stone-300 mb-8">
-              {gameState.winner ? gameState.winner.name : "Unknown Survivor"} cleared their hand!
+              {gameState.winner ? gameState.winner.name : "Unknown Survivor"}{" "}
+              cleared their hand!
             </p>
 
             <div className="grid grid-cols-2 gap-4 max-w-md w-full mb-8">
