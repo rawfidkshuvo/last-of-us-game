@@ -1356,7 +1356,7 @@ export default function LastOfUs() {
                     : "border-stone-700 bg-stone-900/50"
                 } ${
                   gameState.players[gameState.turnIndex].id === p.id
-                    ? "ring-2 ring-yellow-500"
+                    ? "ring-2 ring-yellow-500 animate-pulse"
                     : ""
                 }`}
               >
