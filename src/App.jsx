@@ -110,6 +110,15 @@ const Logo = () => (
   </div>
 );
 
+const LogoBig = () => (
+  <div className="flex items-center justify-center gap-1 opacity-40 mt-auto pb-2 pt-2 relative z-10">
+    <Skull size={22} className="text-red-600" />
+    <span className="text-[20px] font-black tracking-widest text-red-600 uppercase">
+      LAST OF US
+    </span>
+  </div>
+);
+
 // --- Components ---
 
 const FloatingBackground = () => (
@@ -1057,7 +1066,7 @@ export default function LastOfUs() {
             onClick={() => setShowGuide(true)}
             className="w-full text-center text-stone-500 hover:text-stone-300 text-sm flex items-center justify-center gap-2"
           >
-            <BookOpen size={14} /> Field Manual
+            <BookOpen size={14} /> Survival Guide
           </button>
         </div>
         {showGuide && <GameGuideModal onClose={() => setShowGuide(false)} />}
@@ -1084,6 +1093,7 @@ export default function LastOfUs() {
     return (
       <div className="min-h-screen bg-stone-950 text-white flex flex-col items-center justify-center p-6 relative">
         <FloatingBackground />
+        <LogoBig />
         {showLeaveConfirm && (
           <LeaveConfirmModal
             onConfirmLeave={leaveRoom}
@@ -1157,7 +1167,7 @@ export default function LastOfUs() {
               disabled={gameState.players.length < 2}
               className="w-full py-4 rounded-xl font-black text-xl uppercase tracking-widest bg-red-700 hover:bg-red-600 text-white shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Start Game
+              Start Survival
             </button>
           ) : (
             <div className="w-full py-4 rounded-xl font-bold text-center text-stone-500 bg-stone-800/50 border border-stone-700 animate-pulse">
