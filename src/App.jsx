@@ -1189,7 +1189,9 @@ export default function LastOfUs() {
         </div>
       );
 
-    const isMyTurn = gameState.players[gameState.turnIndex].id === user.uid;
+    // FIX: Safely access the active player. If turnIndex is out of bounds, activePlayer is undefined.
+    const activePlayer = gameState.players[gameState.turnIndex];
+    const isMyTurn = activePlayer?.id === user.uid;
     const opponent = gameState.players.filter((p) => p.id !== user.uid);
     const activeLogs = gameState.logs.slice(-2).reverse();
 
@@ -1365,7 +1367,8 @@ export default function LastOfUs() {
                     ? "border-red-900 bg-red-900/20 opacity-50"
                     : "border-stone-700 bg-stone-900/50"
                 } ${
-                  gameState.players[gameState.turnIndex].id === p.id
+                  // FIX: Use optional chaining (?.) here too
+                  gameState.players[gameState.turnIndex]?.id === p.id
                     ? "ring-2 ring-yellow-500 animate-pulse"
                     : ""
                 }`}
