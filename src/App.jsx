@@ -361,7 +361,9 @@ const GameGuideModal = ({ onClose }) => (
 export default function LastOfUs() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState("menu");
-  const [playerName, setPlayerName] = useState("");
+  const [playerName, setPlayerName] = useState(
+    () => localStorage.getItem("lastofus_playerName") || ""
+  );
   const [roomId, setRoomId] = useState("");
   const [roomCodeInput, setRoomCodeInput] = useState("");
   const [gameState, setGameState] = useState(null);
@@ -392,6 +394,10 @@ export default function LastOfUs() {
     initAuth();
     onAuthStateChanged(auth, setUser);
   }, []);
+
+  useEffect(() => {
+    if (playerName) localStorage.setItem("lastofus_playerName", playerName);
+  }, [playerName]);
 
   // --- Restore Session ---
   useEffect(() => {
