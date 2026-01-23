@@ -361,9 +361,7 @@ const GameGuideModal = ({ onClose }) => (
 export default function LastOfUs() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState("menu");
-  const [playerName, setPlayerName] = useState(
-    () => localStorage.getItem("lastofus_playerName") || ""
-  );
+  
   const [roomId, setRoomId] = useState("");
   const [roomCodeInput, setRoomCodeInput] = useState("");
   const [gameState, setGameState] = useState(null);
@@ -375,6 +373,15 @@ export default function LastOfUs() {
   const [selectedCards, setSelectedCards] = useState([]); // Stores INDICES of selected cards
   const [isQuarantineMode, setIsQuarantineMode] = useState(false); // New state for selection mode
   const [isMaintenance, setIsMaintenance] = useState(false);
+
+  //read and fill global name
+  const [playerName, setPlayerName] = useState(
+    () => localStorage.getItem("gameHub_playerName") || ""
+  );
+  //set global name for all game
+  useEffect(() => {
+    if (playerName) localStorage.setItem("gameHub_playerName", playerName);
+  }, [playerName]);
 
   // Helper for auto-dismissing errors
   const showError = (msg) => {
@@ -395,9 +402,7 @@ export default function LastOfUs() {
     onAuthStateChanged(auth, setUser);
   }, []);
 
-  useEffect(() => {
-    if (playerName) localStorage.setItem("lastofus_playerName", playerName);
-  }, [playerName]);
+  
 
   // --- Restore Session ---
   useEffect(() => {
