@@ -20,6 +20,8 @@ import {
   Skull,
   Syringe,
   Biohazard,
+  Pill,
+  Crosshair,
   Users,
   Play,
   LogOut,
