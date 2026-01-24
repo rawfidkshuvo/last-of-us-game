@@ -121,24 +121,48 @@ const LogoBig = () => (
 
 // --- Components ---
 
-const FloatingBackground = () => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-    <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-900/30 via-stone-950 to-black" />
+const DICE_ICONS = {
+  1: Biohazard,
+  2: Pill,
+  3: Crosshair,
+  4: Skull,
+  5: Syringe,
+};
+
+const FloatingBackground = ({ isShaking }) => (
+  <div
+    className={`absolute inset-0 overflow-hidden pointer-events-none z-0 ${
+      isShaking ? "animate-shake bg-red-900/20" : ""
+    }`}
+  >
+    {/* Background Gradient */}
+    <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/40 via-gray-950 to-black" />
+    
     <div className="absolute top-0 left-0 w-full h-full opacity-10">
-      {[...Array(20)].map((_, i) => (
-        <div
-          key={i}
-          className="absolute animate-float text-stone-500/20"
-          style={{
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
-            animationDuration: `${15 + Math.random() * 20}s`,
-            transform: `scale(${0.5 + Math.random()})`,
-          }}
-        >
-          {i % 2 === 0 ? <Skull size={48} /> : <Syringe size={48} />}
-        </div>
-      ))}
+      {[...Array(20)].map((_, i) => {
+        // --- CHANGE START ---
+        const diceKeys = Object.keys(DICE_ICONS);
+        // We cycle through keys 1-6 based on the index
+        const key = diceKeys[i % diceKeys.length]; 
+        // Direct assignment because DICE_ICONS values are the components themselves
+        const Icon = DICE_ICONS[key]; 
+        // --- CHANGE END ---
+
+        return (
+          <div
+            key={i}
+            className="absolute animate-float text-white/20"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDuration: `${10 + Math.random() * 20}s`,
+              transform: `scale(${0.5 + Math.random()})`,
+            }}
+          >
+            <Icon size={32} />
+          </div>
+        );
+      })}
     </div>
     <style>{`
       @keyframes float {
@@ -146,6 +170,13 @@ const FloatingBackground = () => (
         50% { transform: translateY(-20px) rotate(10deg); }
       }
       .animate-float { animation: float infinite ease-in-out; }
+      
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+        20%, 40%, 60%, 80% { transform: translateX(5px); }
+      }
+      .animate-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
     `}</style>
   </div>
 );
