@@ -138,7 +138,7 @@ const FloatingBackground = ({ isShaking }) => (
     }`}
   >
     {/* Background Gradient */}
-    <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/40 via-gray-950 to-black" />
+    <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-slate-900/40 via-gray-950 to-black" />
     
     <div className="absolute top-0 left-0 w-full h-full opacity-10">
       {[...Array(20)].map((_, i) => {
@@ -153,7 +153,7 @@ const FloatingBackground = ({ isShaking }) => (
         return (
           <div
             key={i}
-            className="absolute animate-float text-white/20"
+            className="absolute animate-float text-white/60"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
@@ -203,8 +203,8 @@ const Card = ({
       : "bg-lime-900 border-lime-500 shadow-lime-900/40";
   } else {
     bgClass = isZ
-      ? "bg-gradient-to-b from-red-800 to-stone-900 border-red-600"
-      : "bg-gradient-to-b from-lime-700 to-stone-900 border-lime-500";
+      ? "bg-linear-to-b from-red-800 to-stone-900 border-red-600"
+      : "bg-linear-to-b from-lime-700 to-stone-900 border-lime-500";
   }
 
   const textClass = isZ ? "text-red-100" : "text-lime-100";
@@ -275,9 +275,9 @@ const LeaveConfirmModal = ({
   isHost,
   inGame,
 }) => (
-  <div className="fixed inset-0 bg-black/90 z-[200] flex items-center justify-center p-4 animate-in fade-in">
+  <div className="fixed inset-0 bg-black/90 z-200 flex items-center justify-center p-4 animate-in fade-in">
     <div className="bg-stone-900 rounded-xl border border-red-900/50 p-6 max-w-sm w-full text-center shadow-2xl relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-transparent" />
+      <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-red-600 to-transparent" />
       <h3 className="text-xl font-bold text-white mb-2 flex items-center justify-center gap-2">
         <Biohazard className="text-red-500" /> Abandon Zone?
       </h3>
@@ -315,7 +315,7 @@ const LeaveConfirmModal = ({
 );
 
 const GameGuideModal = ({ onClose }) => (
-  <div className="fixed inset-0 bg-black/95 z-[150] flex items-center justify-center p-4">
+  <div className="fixed inset-0 bg-black/95 z-150 flex items-center justify-center p-4">
     <div className="bg-stone-900 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden border border-red-900/30 flex flex-col">
       <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-black/50">
         <h2 className="text-2xl font-black text-red-500 uppercase tracking-widest flex items-center gap-2">
@@ -1064,7 +1064,7 @@ export default function LastOfUs() {
               className="text-lime-500 animate-bounce delay-75"
             />
           </div>
-          <h1 className="text-4xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-stone-500 uppercase tracking-tighter">
+          <h1 className="text-4xl md:text-7xl font-black text-transparent bg-clip-text bg-linear-to-r from-red-500 to-stone-500 uppercase tracking-tighter">
             Last of Us
           </h1>
           <p className="text-stone-500 tracking-[0.5em] uppercase mt-2 font-bold text-xs md:text-sm">
@@ -1259,7 +1259,7 @@ export default function LastOfUs() {
         {showGuide && <GameGuideModal onClose={() => setShowGuide(false)} />}
 
         {/* Header */}
-        <div className="h-14 bg-stone-900/90 border-b border-stone-800 flex items-center justify-between px-4 z-[160] sticky top-0 backdrop-blur-md">
+        <div className="h-14 bg-stone-900/90 border-b border-stone-800 flex items-center justify-between px-4 z-160 sticky top-0 backdrop-blur-md">
           <div className="flex items-center gap-2">
             <Biohazard className="text-red-600" size={24} />
             <span className="font-black uppercase hidden md:block">
@@ -1294,7 +1294,7 @@ export default function LastOfUs() {
 
         {/* Logs Overlay - Modal */}
         {showLogs && (
-          <div className="fixed top-16 right-4 z-[155] bg-stone-900/95 border border-stone-700 p-2 rounded-xl max-h-60 overflow-y-auto w-64 shadow-2xl">
+          <div className="fixed top-16 right-4 z-155 bg-stone-900/95 border border-stone-700 p-2 rounded-xl max-h-60 overflow-y-auto w-64 shadow-2xl">
             {[...gameState.logs].reverse().map((l, i) => (
               <div
                 key={i}
@@ -1312,7 +1312,7 @@ export default function LastOfUs() {
 
         {/* Winner Screen */}
         {gameState.status === "finished" && (
-          <div className="fixed inset-0 top-14 z-[150] bg-black/95 flex flex-col items-center justify-center p-6 text-center animate-in zoom-in">
+          <div className="fixed inset-0 top-14 z-150 bg-black/95 flex flex-col items-center justify-center p-6 text-center animate-in zoom-in">
             <Crown size={80} className="text-yellow-500 mb-6 animate-bounce" />
             <h1 className="text-5xl font-black text-white mb-4">
               Survivor Found!
