@@ -699,6 +699,9 @@ export default function LastOfUs() {
 
     const activeRoundPlayers = players.map((p) => p.id); // All players start in round
 
+    // 2. Calculate Random Start Index
+    const randomStartIndex = Math.floor(Math.random() * players.length);
+
     await updateDoc(
       doc(db, "artifacts", APP_ID, "public", "data", "rooms", roomId),
       {
@@ -707,7 +710,7 @@ export default function LastOfUs() {
         deck: fullDeck, // Remaining cards (unused this game)
         board: [],
         activeRoundPlayers,
-        turnIndex: 0,
+        turnIndex: randomStartIndex,
         logs: [{ text: "Survival begins. Good luck.", type: "neutral" }],
       }
     );
