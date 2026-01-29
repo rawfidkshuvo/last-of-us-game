@@ -48,11 +48,11 @@ const firebaseConfig =
     ? JSON.parse(__firebase_config)
     : {
         apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-        authDomain: "game-hub-ff8aa.firebaseapp.com",
+        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
         projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-        storageBucket: "game-hub-ff8aa.firebasestorage.app",
-        messagingSenderId: "586559578902",
-        appId: "1:586559578902:web:36417135068764fe6aa637"
+        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+        appId: import.meta.env.VITE_FIREBASE_APP_ID,
       };
 
 const app = initializeApp(firebaseConfig);
@@ -139,15 +139,15 @@ const FloatingBackground = ({ isShaking }) => (
   >
     {/* Background Gradient */}
     <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-slate-900/40 via-gray-950 to-black" />
-    
+
     <div className="absolute top-0 left-0 w-full h-full opacity-10">
       {[...Array(20)].map((_, i) => {
         // --- CHANGE START ---
         const diceKeys = Object.keys(DICE_ICONS);
         // We cycle through keys 1-6 based on the index
-        const key = diceKeys[i % diceKeys.length]; 
+        const key = diceKeys[i % diceKeys.length];
         // Direct assignment because DICE_ICONS values are the components themselves
-        const Icon = DICE_ICONS[key]; 
+        const Icon = DICE_ICONS[key];
         // --- CHANGE END ---
 
         return (
@@ -217,8 +217,8 @@ const Card = ({
     size === "lg"
       ? "w-20 h-32 md:w-28 md:h-40 text-3xl md:text-5xl"
       : size === "sm"
-      ? "w-10 h-14 text-xs"
-      : "w-16 h-24 md:w-20 md:h-28 text-xl md:text-2xl";
+        ? "w-10 h-14 text-xs"
+        : "w-16 h-24 md:w-20 md:h-28 text-xl md:text-2xl";
 
   return (
     <div
@@ -285,8 +285,8 @@ const LeaveConfirmModal = ({
         {isHost
           ? "WARNING: As Host, leaving will disband the group and return everyone to the menu."
           : inGame
-          ? "Leaving now will disrupt the survival effort."
-          : "Disconnect from the safe house?"}
+            ? "Leaving now will disrupt the survival effort."
+            : "Disconnect from the safe house?"}
       </p>
       <div className="flex flex-col gap-3">
         <button
@@ -394,7 +394,7 @@ const GameGuideModal = ({ onClose }) => (
 export default function LastOfUs() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState("menu");
-  
+
   const [roomId, setRoomId] = useState("");
   const [roomCodeInput, setRoomCodeInput] = useState("");
   const [gameState, setGameState] = useState(null);
@@ -409,7 +409,7 @@ export default function LastOfUs() {
 
   //read and fill global name
   const [playerName, setPlayerName] = useState(
-    () => localStorage.getItem("gameHub_playerName") || ""
+    () => localStorage.getItem("gameHub_playerName") || "",
   );
   //set global name for all game
   useEffect(() => {
@@ -434,8 +434,6 @@ export default function LastOfUs() {
     initAuth();
     onAuthStateChanged(auth, setUser);
   }, []);
-
-  
 
   // --- Restore Session ---
   useEffect(() => {
@@ -499,7 +497,7 @@ export default function LastOfUs() {
           localStorage.removeItem("lastofus_roomId"); // Clear storage if room closed
           showError("Safe house compromised (Room closed).");
         }
-      }
+      },
     );
     return () => unsub();
   }, [roomId, user]);
@@ -617,7 +615,7 @@ export default function LastOfUs() {
         activeRoundPlayers: [], // IDs of players still in round
         logs: [],
         winner: null,
-      }
+      },
     );
     // Persist Session
     localStorage.setItem("lastofus_roomId", newId);
@@ -635,7 +633,7 @@ export default function LastOfUs() {
       "public",
       "data",
       "rooms",
-      roomCodeInput
+      roomCodeInput,
     );
     const snap = await getDoc(ref);
     if (!snap.exists()) {
@@ -680,7 +678,7 @@ export default function LastOfUs() {
       doc(db, "artifacts", APP_ID, "public", "data", "rooms", roomId),
       {
         players,
-      }
+      },
     );
   };
 
@@ -712,7 +710,7 @@ export default function LastOfUs() {
         activeRoundPlayers,
         turnIndex: randomStartIndex,
         logs: [{ text: "Survival begins. Good luck.", type: "neutral" }],
-      }
+      },
     );
   };
 
@@ -738,7 +736,7 @@ export default function LastOfUs() {
         board: [],
         logs: [],
         activeRoundPlayers: [],
-      }
+      },
     );
     setShowLeaveConfirm(false);
   };
@@ -746,12 +744,12 @@ export default function LastOfUs() {
   const toggleReady = async () => {
     if (!roomId || !user) return;
     const updatedPlayers = gameState.players.map((p) =>
-      p.id === user.uid ? { ...p, ready: !p.ready } : p
+      p.id === user.uid ? { ...p, ready: !p.ready } : p,
     );
 
     await updateDoc(
       doc(db, "artifacts", APP_ID, "public", "data", "rooms", roomId),
-      { players: updatedPlayers }
+      { players: updatedPlayers },
     );
   };
 
@@ -813,7 +811,7 @@ export default function LastOfUs() {
             text: `${me.name} survived! Game Over.`,
             type: "success",
           }),
-        }
+        },
       );
       setSelectedCards([]);
       return;
@@ -841,7 +839,7 @@ export default function LastOfUs() {
           text: `${me.name} played ${count}x ${cardVal}.`,
           type: "neutral",
         }),
-      }
+      },
     );
     setSelectedCards([]);
   };
@@ -880,7 +878,7 @@ export default function LastOfUs() {
 
     // Remove from active round
     const newActivePlayers = gameState.activeRoundPlayers.filter(
-      (id) => id !== user.uid
+      (id) => id !== user.uid,
     );
 
     const logs = [
@@ -915,7 +913,7 @@ export default function LastOfUs() {
           activeRoundPlayers: resetPlayers.map((p) => p.id), // All back in
           turnIndex: winnerIdx,
           logs: arrayUnion(...logs),
-        }
+        },
       );
     } else {
       // Move turn
@@ -935,7 +933,7 @@ export default function LastOfUs() {
           activeRoundPlayers: newActivePlayers,
           turnIndex: nextTurnIdx,
           logs: arrayUnion(...logs),
-        }
+        },
       );
     }
     setIsQuarantineMode(false);
@@ -952,7 +950,7 @@ export default function LastOfUs() {
         "public",
         "data",
         "rooms",
-        roomId
+        roomId,
       );
       const snap = await getDoc(roomRef);
       if (snap.exists()) {
