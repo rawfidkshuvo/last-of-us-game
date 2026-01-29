@@ -594,7 +594,11 @@ export default function LastOfUs() {
   const createRoom = async () => {
     if (!playerName) return showError("Name required");
     setLoading(true);
-    const newId = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const chars = "123456789ABCDEFGHIJKLMNPQRSTUVWXYZ";
+    let newId = "";
+    for (let i = 0; i < 6; i++) {
+      newId += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
 
     await setDoc(
       doc(db, "artifacts", APP_ID, "public", "data", "rooms", newId),
