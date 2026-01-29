@@ -39,6 +39,7 @@ import {
   Home,
   Sparkles,
   Trash2,
+  Copy,
 } from "lucide-react";
 
 // --- Firebase Config ---
@@ -682,6 +683,21 @@ export default function LastOfUs() {
     );
   };
 
+  const copyToClipboard = () => {
+    try {
+      navigator.clipboard.writeText(roomId);
+      triggerFeedback("neutral", "COPIED!", "", CheckCircle);
+    } catch (e) {
+      const el = document.createElement("textarea");
+      el.value = roomId;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      triggerFeedback("neutral", "COPIED!", "", CheckCircle);
+    }
+  };
+
   const startGame = async () => {
     if (gameState.hostId !== user.uid) return;
     const pCount = gameState.players.length;
@@ -1152,11 +1168,21 @@ export default function LastOfUs() {
         <div className="z-10 w-full max-w-lg bg-stone-900/90 backdrop-blur p-8 rounded-2xl border border-red-900/30 shadow-2xl">
           <div className="flex justify-between items-center mb-6 pb-4 border-b border-stone-800">
             <div>
-              <h2 className="text-xl text-red-600 font-bold uppercase">
-                Safe Zone
-              </h2>
-              <div className="text-3xl font-mono text-white font-black">
-                {gameState.roomId}
+              {/* Grouping Title and Copy Button together on the left */}
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl text-red-600 font-bold uppercase">
+                  Safe Zone
+                </h2>
+                <div className="text-3xl font-mono text-white font-black">
+                  {gameState.roomId}
+                </div>
+                <button
+                  onClick={copyToClipboard}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white"
+                  title="Copy Room ID"
+                >
+                  <Copy size={16} />
+                </button>
               </div>
             </div>
             <button
